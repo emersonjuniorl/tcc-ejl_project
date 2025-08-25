@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avaliação de Maturidade e Compliance</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .dimension {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .dimension h3 {
+            color: #34495e;
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        .question {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        .question-text {
+            font-weight: 500;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        .rating {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .rating input[type="radio"] {
+            margin: 0;
+        }
+        .rating label {
+            cursor: pointer;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f8f9fa;
+            transition: all 0.2s;
+        }
+        .rating label:hover {
+            background: #e9ecef;
+            border-color: #3498db;
+        }
+        .rating input[type="radio"]:checked + label {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        .submit-btn {
+            background: #27ae60;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        .submit-btn:hover {
+            background: #229954;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #7f8c8d;
+        }
+        .error {
+            color: #e74c3c;
+            background: #fdf2f2;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Avaliação de Maturidade e Compliance</h1>
+        
+        <form id="questionnaireForm">
+            <div id="questionsContainer">
+                <!-- Questions will be loaded here -->
+            </div>
+            
+            <div class="loading" id="loading">
+                Carregando questões...
+            </div>
+            
+            <div class="error" id="error"></div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">
+                📋 Enviar Avaliação
+            </button>
+        </form>
+    </div>
+
+    <script>
+        let questions = [];
+        let currentProjectId = null;
+
+        // Load questions on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadQuestions();
+        });
+
+        async function loadQuestions() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                const response = await fetch('/api/questions/');
+                questions = await response.json();
+                
+                // Group questions by dimension
+                const dimensions = {};
+                questions.forEach(q => {
+                    if (!dimensions[q.dimension]) {
+                        dimensions[q.dimension] = [];
+                    }
+                    dimensions[q.dimension].push(q);
+                });
+
+                // Load dimensions to get titles
+                const dimResponse = await fetch('/api/dimensions/');
+                const dimensionsData = await dimResponse.json();
+                const dimMap = {};
+                dimensionsData.forEach(d => {
+                    dimMap[d.id] = d;
+                });
+
+                renderQuestions(dimensions, dimMap);
+            } catch (error) {
+                showError('Erro ao carregar questões: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function renderQuestions(dimensions, dimMap) {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = '';
+
+            Object.keys(dimensions).forEach(dimId => {
+                const dim = dimMap[dimId];
+                const questions = dimensions[dimId];
+                
+                const dimDiv = document.createElement('div');
+                dimDiv.className = 'dimension';
+                dimDiv.innerHTML = `
+                    <h3>${dim.title} (${dim.framework})</h3>
+                `;
+
+                questions.forEach(q => {
+                    const questionDiv = document.createElement('div');
+                    questionDiv.className = 'question';
+                    questionDiv.innerHTML = `
+                        <div class="question-text">${q.text}</div>
+                        <div class="rating">
+                            <input type="radio" name="q_${q.id}" value="1" id="q${q.id}_1" required>
+                            <label for="q${q.id}_1">1 - Não implementado</label>
+                            
+                            <input type="radio" name="q_${q.id}" value="2" id="q${q.id}_2">
+                            <label for="q${q.id}_2">2 - Inicial</label>
+                            
+                            <input type="radio" name="q_${q.id}" value="3" id="q${q.id}_3">
+                            <label for="q${q.id}_3">3 - Parcial</label>
+                            
+                            <input type="radio" name="q_${q.id}" value="4" id="q${q.id}_4">
+                            <label for="q${q.id}_4">4 - Implementado</label>
+                            
+                            <input type="radio" name="q_${q.id}" value="5" id="q${q.id}_5">
+                            <label for="q${q.id}_5">5 - Otimizado</label>
+                        </div>
+                    `;
+                    dimDiv.appendChild(questionDiv);
+                });
+
+                container.appendChild(dimDiv);
+            });
+        }
+
+        document.getElementById('questionnaireForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // For demo purposes, create a simple project first
+            if (!currentProjectId) {
+                try {
+                    const projectResponse = await fetch('/api/demo-project/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            name: 'Avaliação - ' + new Date().toLocaleDateString()
+                        })
+                    });
+                    
+                    if (projectResponse.ok) {
+                        const project = await projectResponse.json();
+                        currentProjectId = project.id;
+                    } else {
+                        const errorData = await projectResponse.json();
+                        throw new Error(errorData.error || 'Erro ao criar projeto');
+                    }
+                } catch (error) {
+                    showError('Erro ao criar projeto: ' + error.message);
+                    return;
+                }
+            }
+
+            // Collect answers
+            const answers = [];
+            questions.forEach(q => {
+                const value = document.querySelector(`input[name="q_${q.id}"]:checked`);
+                if (value) {
+                    answers.push({
+                        question: q.id,
+                        value: parseInt(value.value)
+                    });
+                }
+            });
+
+            if (answers.length !== questions.length) {
+                showError('Por favor, responda todas as questões.');
+                return;
+            }
+
+            // Submit assessment
+            try {
+                document.getElementById('submitBtn').disabled = true;
+                document.getElementById('submitBtn').textContent = 'Enviando...';
+
+                const assessmentResponse = await fetch('/api/demo-assessment/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        project: currentProjectId,
+                        answers: answers
+                    })
+                });
+
+                if (assessmentResponse.ok) {
+                    const assessment = await assessmentResponse.json();
+                    showResults(assessment.id);
+                } else {
+                    throw new Error('Erro ao enviar avaliação');
+                }
+            } catch (error) {
+                showError('Erro ao enviar avaliação: ' + error.message);
+            } finally {
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').textContent = '📋 Enviar Avaliação';
+            }
+        });
+
+        async function showResults(assessmentId) {
+            try {
+                const response = await fetch(`/api/demo-report/${assessmentId}/`);
+                const report = await response.json();
+                
+                const container = document.getElementById('questionsContainer');
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <h2 style="color: #27ae60;">✅ Avaliação Concluída!</h2>
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <h3>📊 Resultados</h3>
+                            <p><strong>Compliance:</strong> ${report.scores.compliance}%</p>
+                            <p><strong>Maturidade:</strong> ${report.scores.maturity}%</p>
+                        </div>
+                        <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <h3>💡 Recomendações</h3>
+                            <ul style="text-align: left;">
+                                ${report.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <button onclick="location.reload()" style="background: #3498db; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+                            🔄 Nova Avaliação
+                        </button>
+                    </div>
+                `;
+            } catch (error) {
+                showError('Erro ao carregar relatório: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
